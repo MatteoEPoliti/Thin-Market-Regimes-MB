@@ -39,6 +39,11 @@ data and forms the analytical foundation of the thesis.
 - Italian decimal formatting (`","` → `"."`)
 - Timestamp alignment from hourly resolution (MGP, load) 
   to 15-minute intervals (MB, RES) via row expansion
+- **Source-aware NaN handling**: solar and wind split before `dropna()` 
+  to avoid discarding ~7,000 solar records due to missing wind intraday data; 
+  residual wind gaps filled with forward fill (<0.8% of data affected)
+- **Geographic scope**: IT-North/Centre macrozone only; 
+  "SUD" entries explicitly excluded
 
 ### 2. Feature Engineering
 - **Congestion index**: percentage price divergence between PUN and CNOR macrozone
