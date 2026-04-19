@@ -1,107 +1,124 @@
-# Italian Electricity Balancing Market — Exploratory Analysis
-**BM_light** · Master's Thesis in Energy Engineering · First standalone Python project
+# Thin-Market Regimes in the Italian Balancing Market
+
+Empirical identification of a structural two-regime behavior in MB prices,
+using TERNA, GME and ENTSO-E data (Jan–Aug 2025).
+
+![Price BM vs Volume BM — thin-market regime](docs/price_vs_volume.png)
 
 ---
 
-## Overview
+## Key finding
 
-This project is a self-contained exploratory analysis of the Italian electricity 
-balancing market (Mercato del Bilanciamento, MB), 
-built as part of my Master's thesis in Energy Engineering.
+Balancing prices in the Italian MB show a sharp volatility spike in the
+**[−50, +50] MWh zone** of net imbalance volume — a *thin-market regime*
+where individual players lose price-taker status. Regime switches of
+roughly **130 €/MWh** occur at the zero-crossing (from ~200 €/MWh to
+~70 €/MWh depending on sign).
 
-It covers the full pipeline from raw data ingestion to modelling and visualization, 
-working directly with real market data from TERNA, GME, and ENTSO-E.
-
-The core finding — a structural two-regime behavior in balancing prices driven 
-by a thin market zone around zero imbalance volume — emerged empirically from the 
-data and forms the analytical foundation of the thesis.
+A global linear model fits the data with an RMSE/std ratio close to 1 —
+no better than the unconditional mean. Regime-segmented evaluation,
+by contrast, reveals structure invisible to the global fit, and forms
+the empirical core of my Master's thesis in Energy Engineering.
 
 ---
 
-## Data Sources
+## Why it matters
 
-| Source | Data | Format | Period |
-|--------|------|--------|--------|
-| GME | Day-ahead prices: PUN, CNOR | XML (Jan–Jun), XLSX (Jul–Aug) | Jan–Aug 2025 |
-| ENTSO-E | Load forecast and actual, IT-North | CSV | Jan–Aug 2025 |
-| ENTSO-E | Solar and wind forecast and actual, Italy | CSV | Jan–Aug 2025 |
-| TERNA | Balancing volumes and prices, IT-North | CSV | Jan–Aug 2025 |
+Players whose imbalance brings them into the thin zone face structurally
+different settlement prices from those who stay outside it. A forecasting
+or strategy framework that ignores this non-linearity is mis-specified
+by construction — not by noise. The finding motivates the regime-based
+architecture of the full thesis.
 
-> Note: GME changed its publication format mid-year (June → July), requiring 
-> a dual ingestion approach for day-ahead prices.
+---
+
+## Data
+
+| Source   | Data                                   | Format              | Period       |
+|----------|----------------------------------------|---------------------|--------------|
+| GME      | Day-ahead prices: PUN, CNOR            | XML → XLSX (Jun→Jul)| Jan–Aug 2025 |
+| ENTSO-E  | Load forecast and actual, IT-North     | CSV                 | Jan–Aug 2025 |
+| ENTSO-E  | Solar and wind forecast and actual, IT | CSV                 | Jan–Aug 2025 |
+| TERNA    | Balancing volumes and prices, IT-North | CSV                 | Jan–Aug 2025 |
+
+> GME changed its publication format mid-year (June → July), requiring
+> a dual ingestion path for day-ahead prices.
 
 ---
 
 ## Pipeline
 
-### 1. Data Cleaning
-- Parsing of XML, CSV, and XLSX files across four independent sources
-- Italian decimal formatting (`","` → `"."`)
-- Timestamp alignment from hourly resolution (MGP, load) 
-  to 15-minute intervals (MB, RES) via row expansion
-- **Source-aware NaN handling**: solar and wind split before `dropna()` 
-  to avoid discarding ~7,000 solar records due to missing wind intraday data; 
-  residual wind gaps filled with forward fill (<0.8% of data affected)
-- **Geographic scope**: IT-North/Centre macrozone only; 
-  "SUD" entries explicitly excluded
+### 1. Data cleaning
 
-### 2. Feature Engineering
-- **Congestion index**: percentage price divergence between PUN and CNOR macrozone
-- **Forecast errors**: load, solar, and wind (actual − forecast)
-- **Lag shift(16)**: all exogenous features lagged by 4 hours (16 × 15 min), 
-  consistent with ENTSO-E publication delay to prevent data leakage
+- Parsing of XML, CSV and XLSX across four independent sources
+- Italian decimal handling (`","` → `"."`)
+- Timestamp alignment from hourly (MGP, load) to 15-minute resolution
+  (MB, RES) via row expansion
+- **Source-aware NaN handling**: solar and wind split before `dropna()`
+  to avoid discarding ~7,000 solar records due to missing wind intraday
+  data; residual wind gaps filled via forward-fill (<0.8% affected)
+- **Geographic scope**: IT-North/Centre macrozone only; "SUD" excluded
+
+### 2. Feature engineering
+
+- **Congestion index**: percentage price divergence between PUN and CNOR
+- **Forecast errors**: load, solar and wind (actual − forecast)
+- **Lag shift(16)**: exogenous features lagged by 4 hours (16 × 15 min),
+  consistent with ENTSO-E publication delay — prevents data leakage
 - **Autoregressive terms**: balancing volume and price lagged by 4 hours
 - **Time features**: hour of day, weekend flag
 
 ### 3. Modelling
-Linear regression baseline trained on January–June 2025, 
-tested on July–August 2025, targeting balancing volume and price separately.
 
-| Target | RMSE / Std |
-|--------|-----------|
-| Volume BM | ~0.93 |
-| Price BM | ~0.94 |
+Linear regression baseline trained on January–June 2025 and tested on
+July–August 2025, targeting balancing volume and price separately.
 
-Performance is intentionally limited: the model serves as a diagnostic 
-baseline, not a forecasting tool. Its failure to generalize motivates 
-the regime-based framework developed in the thesis.
+| Target     | RMSE / Std |
+|------------|------------|
+| Volume BM  | ~0.93      |
+| Price BM   | ~0.94      |
 
-### 4. Key Visualization: Thin Market Detection
-The scatter plot of Price BM vs. Volume BM reveals a clear structural break: 
-price volatility spikes sharply in the [-50, +50] MWh zone, 
-identifying a thin market regime where individual players lose 
-price-taker status. This was the central empirical finding of the project.
+Performance is intentionally limited: the model is a diagnostic baseline,
+not a forecasting tool. Its failure to generalize is the motivation for
+the regime-based framework, not a flaw to be optimized away.
 
-A regime switch in this zone can cause balancing prices to move 
-from ~200 €/MWh to ~70 €/MWh depending on whether net imbalance 
-crosses zero — a non-linearity invisible to a global linear model.
+### 4. Regime detection
+
+The scatter plot of Price BM vs. Volume BM reveals the structural break
+described above. The thin-market zone is derived empirically from the
+data, not imposed a priori — which is the analytical claim the thesis
+builds on.
 
 ---
 
-## Key Takeaways
+## Methodological notes
 
-- Pearson correlation underestimates feature relevance for non-linear targets; 
-  scatter plots revealed structure that the heatmap missed
-- A global RMSE metric is methodologically misleading when data 
-  contains structurally distinct regimes
-- The CNOR day-ahead price is the strongest proxy for fundamental 
+- Pearson correlation underestimates feature relevance for non-linear
+  targets; scatter plots surfaced structure that the correlation
+  heatmap missed
+- A global RMSE is methodologically misleading when the data contains
+  structurally distinct regimes — regime-specific evaluation is both
+  more rigorous and substantively different
+- The CNOR day-ahead price is the strongest proxy for fundamental
   market conditions in the MB
-- RES forecast errors show weak linear correlation with balancing prices — 
-  consistent with non-linear, threshold-dependent effects
+- RES forecast errors show weak *linear* correlation with balancing
+  prices — consistent with non-linear, threshold-dependent effects
 
 ---
 
-## Tools
+## Stack
 
 `Python` · `pandas` · `numpy` · `scikit-learn` · `matplotlib` · `seaborn`
 
+Jupyter Notebook, VS Code, Git.
+
 ---
 
-## Status
+## Relation to the thesis
 
-This is the first version (BM_light), focused on EDA and baseline modelling.  
-The full thesis extends this work with:
-- Regime classification framework (thin vs. normal market)
-- ARIMAX + Random Forest two-layer forecasting architecture
-- Backtesting of two trading strategies on regime-segmented data
-- Expanded dataset (2–3 years) to capture annual seasonality
+This repository covers data ingestion, feature engineering, baseline
+modelling and empirical regime identification. The full thesis extends
+the work with a regime classification framework, a two-layer
+ARIMAX + Random Forest forecasting architecture, and backtesting of
+two trading strategies on regime-segmented data over an expanded
+(2–3 year) dataset.
