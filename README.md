@@ -6,8 +6,8 @@
 ## Overview
 
 This project is a self-contained exploratory analysis of the Italian electricity 
-balancing market (Mercato del Bilanciamento, MB), built entirely from scratch 
-without AI assistance as part of my Master's thesis in Energy Engineering.
+balancing market (Mercato del Bilanciamento, MB), 
+built as part of my Master's thesis in Energy Engineering.
 
 It covers the full pipeline from raw data ingestion to modelling and visualization, 
 working directly with real market data from TERNA, GME, and ENTSO-E.
