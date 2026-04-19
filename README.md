@@ -1,49 +1,102 @@
-# BM_light — Italian Balancing Market Analysis
+# Italian Electricity Balancing Market — Exploratory Analysis
+**BM_light** · Master's Thesis in Energy Engineering · First standalone Python project
+
+---
 
 ## Overview
-Preliminary project developed as part of my Master's thesis in Energy Engineering.
-The objective was to demonstrate data extraction and cleaning capabilities on real
-Italian electricity market data, as requested to develop the thesis. 
-The modelling section (6-month train, 2-month test) serves
-as a baseline and proof of concept, with known limitations documented below.
 
-This analyzed sources are the Italian electricity balancing market (Mercato del Bilanciamento)
-using data from TERNA, GME (Gestore Mercati Energetici) and ENTSO-E.
+This project is a self-contained exploratory analysis of the Italian electricity 
+balancing market (Mercato del Bilanciamento, MB), built entirely from scratch 
+without AI assistance as part of my Master's thesis in Energy Engineering.
+
+It covers the full pipeline from raw data ingestion to modelling and visualization, 
+working directly with real market data from TERNA, GME, and ENTSO-E.
+
+The core finding — a structural two-regime behavior in balancing prices driven 
+by a thin market zone around zero imbalance volume — emerged empirically from the 
+data and forms the analytical foundation of the thesis.
+
+---
 
 ## Data Sources
-- **Day-ahead prices (MGP)**: hourly PUN and CNOR zone prices, January–August 2025
-  - January–June: XML files from GME
-  - July–August: Excel files from GME (website format changed)
-- **Load**: day-ahead forecast and actual total load for IT-North bidding zone (ENTSO-E)
-- **RES generation**: solar and wind onshore forecast and actual generation for Italy (ENTSO-E)
-  - Note: no offshore wind data available; no onshore wind actual data (intraday only)
-- **Balancing Market (MB)**: zonal imbalance volumes and prices for IT-North, January–August 2025 (TERNA)
+
+| Source | Data | Format | Period |
+|--------|------|--------|--------|
+| GME | Day-ahead prices: PUN, CNOR | XML (Jan–Jun), XLSX (Jul–Aug) | Jan–Aug 2025 |
+| ENTSO-E | Load forecast and actual, IT-North | CSV | Jan–Aug 2025 |
+| ENTSO-E | Solar and wind forecast and actual, Italy | CSV | Jan–Aug 2025 |
+| TERNA | Balancing volumes and prices, IT-North | CSV | Jan–Aug 2025 |
+
+> Note: GME changed its publication format mid-year (June → July), requiring 
+> a dual ingestion approach for day-ahead prices.
+
+---
 
 ## Pipeline
-1. **Data Cleaning**: parsing of XML, CSV and Excel files from four different sources,
-   timestamp alignment from hourly (MGP, load) to 15-minute intervals (MB, RES)
-2. **Feature Engineering**:
-   - Congestion index: percentage price difference between PUN and CNOR macrozone
-   - Forecast errors for load, solar and wind
-   - Lagged variables (16 periods = 4 hours) to avoid leakage, consistent with
-     ENTSO-E data publication delay
-   - Autoregressive terms: balancing volume and price lagged by 4 hours
-   - Time features: hour of day, weekend flag
-3. **Modelling**: linear regression trained on
-   January–June 2025 and tested on July–August 2025,
-   targeting balancing volume and balancing price separately
 
-## Results
-The model shows limited predictive performance (RMSE/std ≈ 0.94–0.96), attributed to:
-- insufficient data length (8 months, no annual seasonality captured)
-- missing key drivers (gas price, thermoelectric generation)
-- high volatility, asymmetric distribution of balancing volumes
-  and prices and non linear correlation between variables
+### 1. Data Cleaning
+- Parsing of XML, CSV, and XLSX files across four independent sources
+- Italian decimal formatting (`","` → `"."`)
+- Timestamp alignment from hourly resolution (MGP, load) 
+  to 15-minute intervals (MB, RES) via row expansion
 
-## Future Work
-- Extend dataset to 2–3 years to capture annual seasonality
-- Add gas price (TTF) and thermoelectric generation as features
-- Include additional autoregressive lags (t-1d, t-1w)
+### 2. Feature Engineering
+- **Congestion index**: percentage price divergence between PUN and CNOR macrozone
+- **Forecast errors**: load, solar, and wind (actual − forecast)
+- **Lag shift(16)**: all exogenous features lagged by 4 hours (16 × 15 min), 
+  consistent with ENTSO-E publication delay to prevent data leakage
+- **Autoregressive terms**: balancing volume and price lagged by 4 hours
+- **Time features**: hour of day, weekend flag
+
+### 3. Modelling
+Linear regression baseline trained on January–June 2025, 
+tested on July–August 2025, targeting balancing volume and price separately.
+
+| Target | RMSE / Std |
+|--------|-----------|
+| Volume BM | ~0.93 |
+| Price BM | ~0.94 |
+
+Performance is intentionally limited: the model serves as a diagnostic 
+baseline, not a forecasting tool. Its failure to generalize motivates 
+the regime-based framework developed in the thesis.
+
+### 4. Key Visualization: Thin Market Detection
+The scatter plot of Price BM vs. Volume BM reveals a clear structural break: 
+price volatility spikes sharply in the [-50, +50] MWh zone, 
+identifying a thin market regime where individual players lose 
+price-taker status. This was the central empirical finding of the project.
+
+A regime switch in this zone can cause balancing prices to move 
+from ~200 €/MWh to ~70 €/MWh depending on whether net imbalance 
+crosses zero — a non-linearity invisible to a global linear model.
+
+---
+
+## Key Takeaways
+
+- Pearson correlation underestimates feature relevance for non-linear targets; 
+  scatter plots revealed structure that the heatmap missed
+- A global RMSE metric is methodologically misleading when data 
+  contains structurally distinct regimes
+- The CNOR day-ahead price is the strongest proxy for fundamental 
+  market conditions in the MB
+- RES forecast errors show weak linear correlation with balancing prices — 
+  consistent with non-linear, threshold-dependent effects
+
+---
 
 ## Tools
-Python, pandas, scikit-learn, matplotlib, numpy
+
+`Python` · `pandas` · `numpy` · `scikit-learn` · `matplotlib` · `seaborn`
+
+---
+
+## Status
+
+This is the first version (BM_light), focused on EDA and baseline modelling.  
+The full thesis extends this work with:
+- Regime classification framework (thin vs. normal market)
+- ARIMAX + Random Forest two-layer forecasting architecture
+- Backtesting of two trading strategies on regime-segmented data
+- Expanded dataset (2–3 years) to capture annual seasonality
